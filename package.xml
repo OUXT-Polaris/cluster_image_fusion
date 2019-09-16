@@ -15,6 +15,7 @@
   <build_depend>pluginlib</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>vision_msgs</build_depend>
+  <build_depend>vision_info_server</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
   <build_export_depend>hungarian_solver</build_export_depend>
   <build_export_depend>message_filters</build_export_depend>
@@ -22,6 +23,7 @@
   <build_export_depend>pluginlib</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>vision_msgs</build_export_depend>
+  <build_export_depend>vision_info_server</build_export_depend>
   <build_export_depend>dynamic_reconfigure</build_export_depend>
   <exec_depend>hungarian_solver</exec_depend>
   <exec_depend>message_filters</exec_depend>
@@ -29,6 +31,7 @@
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>vision_info_server</exec_depend>
   <exec_depend>dynamic_reconfigure</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->

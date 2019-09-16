@@ -9,12 +9,14 @@
 #include <nodelet/loader.h>
 #include <nodelet/nodelet.h>
 #include <vision_msgs/Detection2DArray.h>
+#include <vision_msgs/VisionInfo.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <dynamic_reconfigure/server.h>
 #include <hungarian_solver/hungarian_solver.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <vision_info_server/vision_info_parser.h>
 
 // Headers in STL
 #include <memory>
@@ -42,6 +44,13 @@ namespace cluster_image_fusion
         void cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr msg);
         boost::optional<sensor_msgs::CameraInfo> camera_info_;
         ros::Subscriber camera_info_sub_;
+        dynamic_reconfigure::Server<cluster_image_fusion::ClusterImageFusionConfig> server_;
+        dynamic_reconfigure::Server<cluster_image_fusion::ClusterImageFusionConfig>::CallbackType param_func_;
+        cluster_image_fusion::ClusterImageFusionConfig config_;
+        vision_msgs::Detection2DArray filterDetection(const vision_msgs::Detection2DArray::ConstPtr detection);
+        vision_info_parser::VisionInfoParser parser_;
+        ros::Subscriber vision_info_sub_;
+        void visionInfoCallback(const vision_msgs::VisionInfo::ConstPtr msg);
     };
 }
 

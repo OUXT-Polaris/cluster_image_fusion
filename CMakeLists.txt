@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pluginlib
   roscpp
   vision_msgs
+  vision_info_server
   dynamic_reconfigure
 )
 
@@ -21,7 +22,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES cluster_image_fusion
-  CATKIN_DEPENDS hungarian_solver message_filters nodelet pluginlib roscpp vision_msgs dynamic_reconfigure
+  CATKIN_DEPENDS hungarian_solver message_filters nodelet pluginlib roscpp vision_msgs dynamic_reconfigure vision_info_server
 #  DEPENDS system_lib
 )
 
