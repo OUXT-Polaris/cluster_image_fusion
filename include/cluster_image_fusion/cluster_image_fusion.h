@@ -33,7 +33,6 @@ namespace cluster_image_fusion
     protected:
         void onInit();
     private:
-
         std::shared_ptr<message_filters::Subscriber<vision_msgs::Detection2DArray> > image_detection_sub_ptr_;
         std::shared_ptr<message_filters::Subscriber<vision_msgs::Detection2DArray> > cluster_rect_sub_ptr_;
         std::shared_ptr<message_filters::Synchronizer<SyncPolicy> > sync_ptr_;
@@ -51,6 +50,7 @@ namespace cluster_image_fusion
         vision_info_parser::VisionInfoParser parser_;
         ros::Subscriber vision_info_sub_;
         void visionInfoCallback(const vision_msgs::VisionInfo::ConstPtr msg);
+        double getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1);
     };
 }
 
