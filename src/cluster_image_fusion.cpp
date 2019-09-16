@@ -8,8 +8,10 @@ namespace cluster_image_fusion
         pnh_ = getPrivateNodeHandle();
         image_detection_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection2DArray> >(pnh_, "input/image_detection", 10);
         cluster_rect_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection2DArray> >(pnh_, "input/cluster_rect", 10);
-        sync_ptr_ = std::make_shared<message_filters::Synchronizer<SyncPolicy> >(SyncPolicy(10),*image_detection_sub_ptr_,*cluster_rect_sub_ptr_);
-        sync_ptr_->registerCallback(boost::bind(&ClusterImageFusion::callback, this, _1, _2));
+        cluster_bbox_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection3DArray> >(pnh_, "input/cluster_bbox", 10);
+        fusioned_result_pub_ = pnh_.advertise<vision_msgs::FusionDetectionArray>("output/fusion_result",1);
+        sync_ptr_ = std::make_shared<message_filters::Synchronizer<SyncPolicy> >(SyncPolicy(10),*image_detection_sub_ptr_,*cluster_rect_sub_ptr_,*cluster_bbox_sub_ptr_);
+        sync_ptr_->registerCallback(boost::bind(&ClusterImageFusion::callback, this, _1, _2, _3));
         camera_info_sub_ = pnh_.subscribe("input/camera_info",1,&ClusterImageFusion::cameraInfoCallback,this);
         vision_info_sub_ = pnh_.subscribe("input/vision_info",1,&ClusterImageFusion::visionInfoCallback,this);
         param_func_ = boost::bind(&ClusterImageFusion::paramCllback, this, _1, _2);
@@ -22,18 +24,83 @@ namespace cluster_image_fusion
         return;
     }
 
-    void ClusterImageFusion::callback(const vision_msgs::Detection2DArray::ConstPtr image_detection,const vision_msgs::Detection2DArray::ConstPtr cluster_rect)
+    std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> ClusterImageFusion::filterClusterDetection
+        (const vision_msgs::Detection2DArray::ConstPtr detection, const vision_msgs::Detection3DArray::ConstPtr detection_3d)
+    {
+        ROS_ASSERT(detection->detections.size() == detection_3d->detections.size());
+        std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> ret;
+        ret.first.header = detection->header;
+        ret.second.header = detection_3d->header;
+        int num_detections = detection->detections.size();
+        for(int i=0; i<num_detections; i++)
+        {
+            if(detection->detections[i].bbox.size_x > config_.min_width && detection->detections[i].bbox.size_y > config_.min_height)
+            {
+                if((detection->detections[i].bbox.center.x+detection->detections[i].bbox.size_x*0.5)>=0 || 
+                    (detection->detections[i].bbox.center.x+detection->detections[i].bbox.size_x*0.5)<=camera_info_->width)
+                    {
+                        if((detection->detections[i].bbox.center.y+detection->detections[i].bbox.size_y*0.5)>=0 || 
+                            (detection->detections[i].bbox.center.y+detection->detections[i].bbox.size_y*0.5)<=camera_info_->height)
+                            {
+                                ret.first.detections.push_back(detection->detections[i]);
+                                ret.second.detections.push_back(detection_3d->detections[i]);
+                            }
+                    }
+            }
+        }
+        return ret;
+    }
+
+    void ClusterImageFusion::callback(const vision_msgs::Detection2DArray::ConstPtr image_detection,
+        const vision_msgs::Detection2DArray::ConstPtr cluster_rect,const vision_msgs::Detection3DArray::ConstPtr cluster_bbox)
     {
         if(camera_info_ && parser_.getClasses())
         {
             vision_msgs::Detection2DArray image_detection_filtered = filterDetection(image_detection);
-            vision_msgs::Detection2DArray cluster_rect_filtered = filterDetection(cluster_rect);
+            std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> cluster_detection_filtered 
+                = filterClusterDetection(cluster_rect,cluster_bbox);
+            Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
+            try
+            {
+                boost::optional<std::vector<std::pair<int,int> > > match = solver_.solve(mat,10);
+                if(match)
+                {
+                    for(auto itr=match->begin(); itr!=match->end(); itr++)
+                    {
+                        vision_msgs::Detection3D cluster_bbox_detection = cluster_detection_filtered.second.detections[itr->first];
+                        vision_msgs::Detection2D cluster_detection = cluster_detection_filtered.first.detections[itr->first];
+                        vision_msgs::Detection2D image_detection = image_detection_filtered.detections[itr->second];
+                    }
+                }
+                else
+                {
+                    ROS_WARN_STREAM("Failed to find match result.");
+                }
+            }
+            catch(...)
+            {
+                ROS_WARN_STREAM("Failed to find match result.");
+                return;
+            }
             return;
         }
         return;
     }
 
-    double getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1)
+    Eigen::MatrixXd ClusterImageFusion::getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered)
+    {
+        Eigen::MatrixXd mat(image_detection_filtered.detections.size(),cluster_rect_filtered.detections.size());
+        for(int r=0; r<cluster_rect_filtered.detections.size(); r++)
+        {
+            for(int c=0; c<image_detection_filtered.detections.size(); c++)
+            {
+                mat(r,c) = 1.0-getIOU(cluster_rect_filtered.detections[r].bbox,image_detection_filtered.detections[c].bbox);
+            }
+        }
+        return mat;
+    }
+
+    double ClusterImageFusion::getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1)
     {
         std::array<double,4> box_a,box_b;
         box_a[0] = rect0.center.x-rect0.size_x*0.5;
@@ -64,7 +131,7 @@ namespace cluster_image_fusion
             {
                 if((itr->bbox.center.x+itr->bbox.size_x*0.5)>=0 || (itr->bbox.center.x-itr->bbox.size_x*0.5)<=camera_info_->width)
                 {
-                    if((itr->bbox.center.y+itr->bbox.size_y*0.5)>=0 || (itr->bbox.center.y-itr->bbox.size_y*0.5)<=camera_info_->width)
+                    if((itr->bbox.center.y+itr->bbox.size_y*0.5)>=0 || (itr->bbox.center.y-itr->bbox.size_y*0.5)<=camera_info_->height)
                     {
                         ret.detections.push_back(*itr);
                     }
