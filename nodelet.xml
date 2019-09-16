@@ -1,0 +1,7 @@
+<library path="lib/libcluster_image_fusion">
+    <class name="cluster_image_fusion/ClusterImageFusion" type="cluster_image_fusion::ClusterImageFusion" base_class_type="nodelet::Nodelet">
+      <description>
+        ClusterImageFusion fusions euclidean clustering rect and detection 
+      </description>
+    </class>
+  </library>

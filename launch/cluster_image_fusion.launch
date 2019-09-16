@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="cluster_image_fusion" type="cluster_image_fusion_node" name="cluster_image_fusion_node" output="log" respawn="true" respawn_delay="0">
+    </node>
+</launch>
