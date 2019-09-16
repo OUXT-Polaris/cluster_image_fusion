@@ -10,7 +10,6 @@
 #include <nodelet/nodelet.h>
 #include <vision_msgs/Detection3DArray.h>
 #include <vision_msgs/Detection2DArray.h>
-#include <vision_msgs/FusionDetectionArray.h>
 #include <vision_msgs/VisionInfo.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -64,7 +63,7 @@ namespace cluster_image_fusion
         double getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1);
         hungarian_solver::Solver solver_;
         Eigen::MatrixXd getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered);
-        ros::Publisher fusioned_result_pub_;
+        ros::Publisher fusion_result_pub_;
     };
 }
 

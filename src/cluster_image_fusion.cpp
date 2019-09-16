@@ -9,7 +9,7 @@ namespace cluster_image_fusion
         image_detection_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection2DArray> >(pnh_, "input/image_detection", 10);
         cluster_rect_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection2DArray> >(pnh_, "input/cluster_rect", 10);
         cluster_bbox_sub_ptr_ = std::make_shared<message_filters::Subscriber<vision_msgs::Detection3DArray> >(pnh_, "input/cluster_bbox", 10);
-        fusioned_result_pub_ = pnh_.advertise<vision_msgs::FusionDetectionArray>("output/fusion_result",1);
+        fusion_result_pub_ = pnh_.advertise<vision_msgs::Detection3DArray>("output/fusion_result",1);
         sync_ptr_ = std::make_shared<message_filters::Synchronizer<SyncPolicy> >(SyncPolicy(10),*image_detection_sub_ptr_,*cluster_rect_sub_ptr_,*cluster_bbox_sub_ptr_);
         sync_ptr_->registerCallback(boost::bind(&ClusterImageFusion::callback, this, _1, _2, _3));
         camera_info_sub_ = pnh_.subscribe("input/camera_info",1,&ClusterImageFusion::cameraInfoCallback,this);
@@ -54,6 +54,8 @@ namespace cluster_image_fusion
     void ClusterImageFusion::callback(const vision_msgs::Detection2DArray::ConstPtr image_detection,
         const vision_msgs::Detection2DArray::ConstPtr cluster_rect,const vision_msgs::Detection3DArray::ConstPtr cluster_bbox)
     {
+        vision_msgs::Detection3DArray fusion_result;
+        fusion_result.header = cluster_bbox->header;
         if(camera_info_ && parser_.getClasses())
         {
             vision_msgs::Detection2DArray image_detection_filtered = filterDetection(image_detection);
@@ -63,6 +65,7 @@ namespace cluster_image_fusion
             int num_cluster_rect_detection_filtered = cluster_detection_filtered.first.detections.size();
             if(num_image_detection_filtered==0 || num_cluster_rect_detection_filtered==0)
             {
+                fusion_result_pub_.publish(fusion_result);
                 return;
             }
             Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
@@ -76,20 +79,26 @@ namespace cluster_image_fusion
                         vision_msgs::Detection3D cluster_bbox_detection = cluster_detection_filtered.second.detections[itr->first];
                         vision_msgs::Detection2D cluster_detection = cluster_detection_filtered.first.detections[itr->first];
                         vision_msgs::Detection2D image_detection = image_detection_filtered.detections[itr->second];
+                        cluster_bbox_detection.results = image_detection.results;
+                        fusion_result.detections.push_back(cluster_bbox_detection);
                     }
                 }
                 else
                 {
+                    fusion_result_pub_.publish(fusion_result);
                     ROS_WARN_STREAM("Failed to find match result.");
                 }
             }
             catch(...)
             {
+                fusion_result_pub_.publish(fusion_result);
                 ROS_WARN_STREAM("Failed to find match result.");
                 return;
             }
+            fusion_result_pub_.publish(fusion_result);
             return;
         }
+        fusion_result_pub_.publish(fusion_result);
         return;
     }
 
