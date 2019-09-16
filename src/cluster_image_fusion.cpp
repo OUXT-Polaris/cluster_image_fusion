@@ -57,8 +57,14 @@ namespace cluster_image_fusion
         if(camera_info_ && parser_.getClasses())
         {
             vision_msgs::Detection2DArray image_detection_filtered = filterDetection(image_detection);
+            int num_image_detection_filtered = image_detection_filtered.detections.size();
             std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> cluster_detection_filtered 
                 = filterClusterDetection(cluster_rect,cluster_bbox);
+            int num_cluster_rect_detection_filtered = cluster_detection_filtered.first.detections.size();
+            if(num_image_detection_filtered==0 || num_cluster_rect_detection_filtered==0)
+            {
+                return;
+            }
             Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
             try
             {
@@ -89,7 +95,7 @@ namespace cluster_image_fusion
 
     Eigen::MatrixXd ClusterImageFusion::getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered)
     {
-        Eigen::MatrixXd mat(image_detection_filtered.detections.size(),cluster_rect_filtered.detections.size());
+        Eigen::MatrixXd mat(cluster_rect_filtered.detections.size(),image_detection_filtered.detections.size());
         for(int r=0; r<cluster_rect_filtered.detections.size(); r++)
         {
             for(int c=0; c<image_detection_filtered.detections.size(); c++)
