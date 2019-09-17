@@ -80,9 +80,7 @@ namespace cluster_image_fusion
             Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
             try
             {
-                //ROS_ERROR_STREAM(pnh_.getNamespace() << "test0");
                 boost::optional<std::vector<std::pair<int,int> > > match = solver_.solve(mat,10);
-                //ROS_ERROR_STREAM(pnh_.getNamespace() << "test1");
                 if(match)
                 {
                     for(auto itr=match->begin(); itr!=match->end(); itr++)

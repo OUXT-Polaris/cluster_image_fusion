@@ -37,9 +37,11 @@ include_directories(
 add_library(cluster_image_fusion src/cluster_image_fusion.cpp)
 target_link_libraries(cluster_image_fusion ${catkin_LIBRARIES})
 class_loader_hide_library_symbols(cluster_image_fusion)
+add_dependencies(cluster_image_fusion ${catkin_EXPORTED_TARGETS})
 
 add_executable(cluster_image_fusion_node src/cluster_image_fusion_node.cpp)
 target_link_libraries(cluster_image_fusion_node ${catkin_LIBRARIES})
+add_dependencies(cluster_image_fusion_node ${catkin_EXPORTED_TARGETS})
 
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
