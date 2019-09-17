@@ -79,8 +79,12 @@ namespace cluster_image_fusion
                         vision_msgs::Detection3D cluster_bbox_detection = cluster_detection_filtered.second.detections[itr->first];
                         vision_msgs::Detection2D cluster_detection = cluster_detection_filtered.first.detections[itr->first];
                         vision_msgs::Detection2D image_detection = image_detection_filtered.detections[itr->second];
-                        cluster_bbox_detection.results = image_detection.results;
-                        fusion_result.detections.push_back(cluster_bbox_detection);
+                        double iou = getIOU(cluster_detection.bbox,image_detection.bbox);
+                        if(iou>config_.min_iou)
+                        {
+                            cluster_bbox_detection.results = image_detection.results;
+                            fusion_result.detections.push_back(cluster_bbox_detection);
+                        }
                     }
                 }
                 else
