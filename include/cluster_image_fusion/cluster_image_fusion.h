@@ -24,6 +24,10 @@
 
 // Headers in Boost
 #include <boost/optional.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/linestring.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/assign/list_of.hpp>
 
 // Headers in Eigen
 #include <Eigen/Core>

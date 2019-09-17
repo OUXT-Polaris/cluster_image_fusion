@@ -36,16 +36,25 @@ namespace cluster_image_fusion
         {
             if(detection->detections[i].bbox.size_x > config_.min_width && detection->detections[i].bbox.size_y > config_.min_height)
             {
-                if((detection->detections[i].bbox.center.x+detection->detections[i].bbox.size_x*0.5)>=0 || 
-                    (detection->detections[i].bbox.center.x+detection->detections[i].bbox.size_x*0.5)<=camera_info_->width)
+                if(detection->detections[i].bbox.size_x <= camera_info_->width && detection->detections[i].bbox.size_y <= camera_info_->height)
+                {
+                    namespace bg = boost::geometry;
+                    typedef bg::model::d2::point_xy<double> point;
+                    typedef bg::model::box<point> box;
+                    typedef bg::model::polygon<point> polygon;
+                    box image_box(point(0, 0), point(camera_info_->width, camera_info_->height));
+                    box detection_box(
+                        point(detection->detections[i].bbox.center.x-detection->detections[i].bbox.size_x*0.5, 
+                            detection->detections[i].bbox.center.y-detection->detections[i].bbox.size_y*0.5), 
+                        point(detection->detections[i].bbox.center.x+detection->detections[i].bbox.size_x*0.5, 
+                            detection->detections[i].bbox.center.y+detection->detections[i].bbox.size_y*0.5));
+                    bool result = bg::disjoint(image_box, detection_box);
+                    if(!result)
                     {
-                        if((detection->detections[i].bbox.center.y+detection->detections[i].bbox.size_y*0.5)>=0 || 
-                            (detection->detections[i].bbox.center.y+detection->detections[i].bbox.size_y*0.5)<=camera_info_->height)
-                            {
-                                ret.first.detections.push_back(detection->detections[i]);
-                                ret.second.detections.push_back(detection_3d->detections[i]);
-                            }
+                        ret.first.detections.push_back(detection->detections[i]);
+                        ret.second.detections.push_back(detection_3d->detections[i]);
                     }
+                }
             }
         }
         return ret;
@@ -71,7 +80,9 @@ namespace cluster_image_fusion
             Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
             try
             {
+                //ROS_ERROR_STREAM(pnh_.getNamespace() << "test0");
                 boost::optional<std::vector<std::pair<int,int> > > match = solver_.solve(mat,10);
+                //ROS_ERROR_STREAM(pnh_.getNamespace() << "test1");
                 if(match)
                 {
                     for(auto itr=match->begin(); itr!=match->end(); itr++)
@@ -121,23 +132,32 @@ namespace cluster_image_fusion
 
     double ClusterImageFusion::getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1)
     {
-        std::array<double,4> box_a,box_b;
-        box_a[0] = rect0.center.x-rect0.size_x*0.5;
-        box_a[1] = rect0.center.y-rect0.size_y*0.5;
-        box_a[2] = rect0.size_x;
-        box_a[3] = rect0.size_y;
-        box_b[0] = rect1.center.x-rect1.size_x*0.5;
-        box_b[1] = rect1.center.y-rect1.size_y*0.5;
-        box_b[2] = rect1.size_x;
-        box_b[3] = rect1.size_y;
-        double x_a = std::max(box_a[0], box_b[0]);
-        double y_a = std::max(box_a[1], box_b[1]);
-        double x_b = std::min(box_a[2], box_b[2]);
-        double y_b = std::min(box_a[3], box_b[3]);
-        double inter_area = std::max(0.0,x_b-x_a+1.0)*std::max(0.0,y_b-y_a+1.0);
-        double box_a_area = (box_a[2] - box_a[0] + 1.0) * (box_a[3] - box_a[1] + 1.0);
-        double box_b_area = (box_b[2] - box_b[0] + 1.0) * (box_b[3] - box_b[1] + 1.0);
-        return inter_area / float(box_a_area + box_b_area - inter_area);
+        namespace bg = boost::geometry;
+        typedef bg::model::d2::point_xy<double> point;
+        typedef bg::model::box<point> box;
+        typedef bg::model::polygon<point> polygon;
+        polygon box0;
+        bg::exterior_ring(box0) = boost::assign::list_of<point>
+            (rect0.center.x-rect0.size_x*0.5,rect0.center.y-rect0.size_y*0.5)
+            (rect0.center.x-rect0.size_x*0.5,rect0.center.y+rect0.size_y*0.5)
+            (rect0.center.x+rect0.size_x*0.5,rect0.center.y+rect0.size_y*0.5)
+            (rect0.center.x+rect0.size_x*0.5,rect0.center.y-rect0.size_y*0.5)
+            (rect0.center.x-rect0.size_x*0.5,rect0.center.y-rect0.size_y*0.5);
+        polygon box1;
+        bg::exterior_ring(box1) = boost::assign::list_of<point>
+            (rect1.center.x-rect1.size_x*0.5,rect1.center.y-rect1.size_y*0.5)
+            (rect1.center.x-rect1.size_x*0.5,rect1.center.y+rect1.size_y*0.5)
+            (rect1.center.x+rect1.size_x*0.5,rect1.center.y+rect1.size_y*0.5)
+            (rect1.center.x+rect1.size_x*0.5,rect1.center.y-rect1.size_y*0.5)
+            (rect1.center.x-rect1.size_x*0.5,rect1.center.y-rect1.size_y*0.5);
+        std::vector<polygon> and_poly,or_poly;
+        bg::union_(box0, box1, or_poly);
+        bg::intersection(box0, box1, and_poly);
+        if(and_poly.size() != 1 || or_poly.size() != 1)
+        {
+            return 0;
+        }
+        return bg::area(and_poly[0])/bg::area(or_poly[0]);
     }
 
     vision_msgs::Detection2DArray ClusterImageFusion::filterDetection(const vision_msgs::Detection2DArray::ConstPtr detection)
