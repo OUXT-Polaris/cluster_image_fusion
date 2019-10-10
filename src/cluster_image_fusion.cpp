@@ -67,20 +67,24 @@ namespace cluster_image_fusion
         fusion_result.header = cluster_bbox->header;
         if(camera_info_ && parser_.getClasses())
         {
-            vision_msgs::Detection2DArray image_detection_filtered = filterDetection(image_detection);
-            int num_image_detection_filtered = image_detection_filtered.detections.size();
-            std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> cluster_detection_filtered 
-                = filterClusterDetection(cluster_rect,cluster_bbox);
-            int num_cluster_rect_detection_filtered = cluster_detection_filtered.first.detections.size();
-            if(num_image_detection_filtered==0 || num_cluster_rect_detection_filtered==0)
-            {
-                fusion_result_pub_.publish(fusion_result);
-                return;
-            }
-            Eigen::MatrixXd mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
             try
             {
-                boost::optional<std::vector<std::pair<int,int> > > match = solver_.solve(mat,10);
+                vision_msgs::Detection2DArray image_detection_filtered = filterDetection(image_detection);
+                int num_image_detection_filtered = image_detection_filtered.detections.size();
+                std::pair<vision_msgs::Detection2DArray,vision_msgs::Detection3DArray> cluster_detection_filtered 
+                    = filterClusterDetection(cluster_rect,cluster_bbox);
+                int num_cluster_rect_detection_filtered = cluster_detection_filtered.first.detections.size();
+                if(num_image_detection_filtered==0 || num_cluster_rect_detection_filtered==0)
+                {
+                    fusion_result_pub_.publish(fusion_result);
+                    return;
+                }
+                boost::optional<Eigen::MatrixXd> mat = getCostMatrix(image_detection_filtered,cluster_detection_filtered.first);
+                if(!mat)
+                {
+                    return;
+                }
+                boost::optional<std::vector<std::pair<int,int> > > match = solver_.solve(*mat,10);
                 if(match)
                 {
                     for(auto itr=match->begin(); itr!=match->end(); itr++)
@@ -115,8 +119,16 @@ namespace cluster_image_fusion
         return;
     }
 
-    Eigen::MatrixXd ClusterImageFusion::getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered)
+    boost::optional<Eigen::MatrixXd> ClusterImageFusion::getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered)
     {
+        if(cluster_rect_filtered.detections.size() == 0)
+        {
+            return boost::none;
+        }
+        if(image_detection_filtered.detections.size() == 0)
+        {
+            return boost::none;
+        }
         Eigen::MatrixXd mat(cluster_rect_filtered.detections.size(),image_detection_filtered.detections.size());
         for(int r=0; r<cluster_rect_filtered.detections.size(); r++)
         {

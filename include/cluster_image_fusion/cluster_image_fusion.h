@@ -66,7 +66,7 @@ namespace cluster_image_fusion
         void visionInfoCallback(const vision_msgs::VisionInfo::ConstPtr msg);
         double getIOU(vision_msgs::BoundingBox2D rect0,vision_msgs::BoundingBox2D rect1);
         hungarian_solver::Solver solver_;
-        Eigen::MatrixXd getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered);
+        boost::optional<Eigen::MatrixXd> getCostMatrix(vision_msgs::Detection2DArray image_detection_filtered,vision_msgs::Detection2DArray cluster_rect_filtered);
         ros::Publisher fusion_result_pub_;
     };
 }

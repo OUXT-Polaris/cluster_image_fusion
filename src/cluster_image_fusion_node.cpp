@@ -5,8 +5,13 @@
 #include <ros/ros.h>
 #include <nodelet/loader.h>
 
+#include <glog/logging.h>
+
 int main(int argc, char **argv)
 {
+    google::InitGoogleLogging(argv[0]);
+    google::InstallFailureSignalHandler();
+    
     ros::init(argc, argv, "cluster_image_fusion", ros::init_options::AnonymousName);
     ros::param::set("~num_worker_threads", 1); // need to call   Loader(bool provide_ros_api = true);
     nodelet::Loader manager(true);
